@@ -87,7 +87,9 @@ GST_DEBUG_CATEGORY_STATIC (gst_rist_sink_debug);
 enum
 {
   PROP_ADDRESS = 1,
+  PROP_BIND_ADDRESS,
   PROP_PORT,
+  PROP_BIND_PORT,
   PROP_SENDER_BUFFER,
   PROP_MIN_RTCP_INTERVAL,
   PROP_MAX_RTCP_BANDWIDTH,
@@ -119,8 +121,10 @@ typedef struct
 {
   guint session;
   gchar *address;
+  gchar *bind_address;
   gchar *multicast_iface;
   guint port;
+  guint bind_port;
   GstElement *rtcp_src;
   GstElement *rtp_sink;
   GstElement *rtcp_sink;
@@ -1102,8 +1106,16 @@ gst_rist_sink_get_property (GObject * object, guint prop_id,
       g_value_set_string (value, bond->address);
       break;
 
+    case PROP_BIND_ADDRESS:
+      g_value_set_string (value, bond->bind_address);
+      break;
+
     case PROP_PORT:
       g_value_set_uint (value, bond->port);
+      break;
+
+    case PROP_BIND_PORT:
+      g_value_set_uint (value, bond->bind_port);
       break;
 
     case PROP_SENDER_BUFFER:
@@ -1193,9 +1205,33 @@ gst_rist_sink_set_property (GObject * object, guint prop_id,
     case PROP_ADDRESS:
       g_free (bond->address);
       bond->address = g_value_dup_string (value);
+      g_object_set_property (G_OBJECT (bond->rtp_sink), "bind-address", value);
+      g_object_set_property (G_OBJECT (bond->rtcp_sink), "bind-address", value);
+      break;
+
+    case PROP_BIND_ADDRESS:
+      g_free (bond->bind_address);
+      bond->bind_address = g_value_dup_string (value);
       g_object_set_property (G_OBJECT (bond->rtp_sink), "host", value);
       g_object_set_property (G_OBJECT (bond->rtcp_sink), "host", value);
       break;
+
+     case PROP_BIND_PORT:{
+      guint bind_port = g_value_get_uint (value);
+
+      /* According to 5.1.1, RTCP receiver port most be event number and RTCP
+       * port should be the RTP port + 1 */
+
+      if (bind_port & 0x1) {
+        g_warning ("Invalid RIST bind port %u, should be an even number.", bind_port);
+        return;
+      }
+
+      bond->bind_port = bind_port;
+      g_object_set (bond->rtp_sink, "bind-port", bind_port, NULL);
+      g_object_set (bond->rtcp_sink, "bind-port", bind_port + 1, NULL);
+      break;
+    }
 
     case PROP_PORT:{
       guint port = g_value_get_uint (value);
@@ -1337,8 +1373,19 @@ gst_rist_sink_class_init (GstRistSinkClass * klass)
           "Address to send packets to (can be IPv4 or IPv6).", "0.0.0.0",
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (object_class, PROP_BIND_ADDRESS,
+      g_param_spec_string ("bind-address", "Bind Address",
+          "Address to send packets from (can be IPv4 or IPv6).", "0.0.0.0",
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
   g_object_class_install_property (object_class, PROP_PORT,
-      g_param_spec_uint ("port", "Port", "The port RTP packets will be sent, "
+      g_param_spec_uint ("port", "Port", "The port RTP packets will be sent to, "
+          "the RTCP port is this value + 1. This port must be an even number.",
+          2, 65534, 5004,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS | G_PARAM_CONSTRUCT));
+
+  g_object_class_install_property (object_class, PROP_BIND_PORT,
+      g_param_spec_uint ("bind-port", "Bind Port", "The port RTP packets will be sent from, "
           "the RTCP port is this value + 1. This port must be an even number.",
           2, 65534, 5004,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS | G_PARAM_CONSTRUCT));
