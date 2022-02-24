@@ -1205,15 +1205,15 @@ gst_rist_sink_set_property (GObject * object, guint prop_id,
     case PROP_ADDRESS:
       g_free (bond->address);
       bond->address = g_value_dup_string (value);
-      g_object_set_property (G_OBJECT (bond->rtp_sink), "bind-address", value);
-      g_object_set_property (G_OBJECT (bond->rtcp_sink), "bind-address", value);
+      g_object_set_property (G_OBJECT (bond->rtp_sink), "host", value);
+      g_object_set_property (G_OBJECT (bond->rtcp_sink), "host", value);
       break;
 
     case PROP_BIND_ADDRESS:
       g_free (bond->bind_address);
       bond->bind_address = g_value_dup_string (value);
-      g_object_set_property (G_OBJECT (bond->rtp_sink), "host", value);
-      g_object_set_property (G_OBJECT (bond->rtcp_sink), "host", value);
+      g_object_set_property (G_OBJECT (bond->rtp_sink), "bind-address", value);
+      g_object_set_property (G_OBJECT (bond->rtcp_sink), "bind-address", value);
       break;
 
      case PROP_BIND_PORT:{
